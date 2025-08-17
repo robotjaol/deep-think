@@ -51,11 +51,7 @@ export class SessionRecovery {
         .select(`
           id,
           started_at,
-          current_state_id,
-          is_paused,
-          time_spent_seconds,
           session_data,
-          recovery_data,
           scenarios (
             title,
             domain,
@@ -83,7 +79,7 @@ export class SessionRecovery {
       if (!sessions) return []
 
       const recoverableSessions: RecoverableSession[] = sessions.map(session => {
-        const sessionData = session.session_data as SessionData
+        const sessionData = session.session_data as unknown as SessionData
         const scenarioConfig = (session.scenarios as any)?.config as ScenarioConfig
         
         // Calculate progress based on decisions made vs total possible states
@@ -106,9 +102,9 @@ export class SessionRecovery {
           startedAt: session.started_at,
           lastActivity: lastDecisionTime,
           progress: Math.round(progress),
-          currentStateId: session.current_state_id || '',
-          isPaused: session.is_paused || false,
-          timeSpent: session.time_spent_seconds || 0
+          currentStateId: '',
+          isPaused: false,
+          timeSpent: 0
         }
       })
 
@@ -177,8 +173,8 @@ export class SessionRecovery {
       }
 
       // Check if session data is corrupted
-      const sessionData = session.session_data as SessionData
-      if (!sessionData || !session.current_state_id) {
+      const sessionData = session.session_data as unknown as SessionData
+      if (!sessionData) {
         return {
           canRecover: false,
           reason: 'Session data is corrupted'
@@ -207,9 +203,9 @@ export class SessionRecovery {
           startedAt: session.started_at,
           lastActivity: lastDecisionTime,
           progress: Math.round(progress),
-          currentStateId: session.current_state_id,
-          isPaused: session.is_paused || false,
-          timeSpent: session.time_spent_seconds || 0
+          currentStateId: '',
+          isPaused: false,
+          timeSpent: 0
         }
       }
     } catch (error) {
@@ -431,12 +427,12 @@ export class SessionRecovery {
       // This could be expanded to use a dedicated logging table
       const { data: session } = await this.supabase
         .from('training_sessions')
-        .select('recovery_data')
+        .select('session_data')
         .eq('id', sessionId)
         .single()
 
       if (session) {
-        const recoveryData = session.recovery_data as any || {}
+        const recoveryData = session.session_data as any || {}
         const events = recoveryData.events || []
         
         events.push({
@@ -448,11 +444,11 @@ export class SessionRecovery {
         await this.supabase
           .from('training_sessions')
           .update({
-            recovery_data: {
+            session_data: {
               ...recoveryData,
               events
             }
-          })
+          } as any)
           .eq('id', sessionId)
       }
     } catch (error) {

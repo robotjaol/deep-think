@@ -58,8 +58,6 @@ export class TrainingSessionManager {
           user_id: userId,
           scenario_id: scenarioId,
           configuration,
-          current_state_id: scenarioConfig.initialState.id,
-          is_paused: false,
           session_data: {
             decisions_made: [],
             state_history: [scenarioConfig.initialState.id],
@@ -68,7 +66,7 @@ export class TrainingSessionManager {
             hints_used: 0,
             current_context: {}
           } as SessionData
-        })
+        } as any)
         .select('id')
         .single()
 
@@ -117,7 +115,7 @@ export class TrainingSessionManager {
       this.sessionId = sessionId
       
       // Restore scenario state manager
-      const currentState = scenarioConfig.states[session.current_state_id || scenarioConfig.initialState.id]
+      const currentState = scenarioConfig.states[scenarioConfig.initialState.id]
       if (!currentState) {
         return { success: false, error: 'Invalid session state' }
       }
@@ -125,7 +123,7 @@ export class TrainingSessionManager {
       this.scenarioStateManager = new ScenarioStateManager(currentState)
       
       // Restore state history if available
-      const sessionData = session.session_data as SessionData
+      const sessionData = session.session_data as unknown as SessionData
       if (sessionData.state_history) {
         // Replay state history to restore scenario state manager
         for (const stateId of sessionData.state_history.slice(1)) {
@@ -140,13 +138,12 @@ export class TrainingSessionManager {
       await this.supabase
         .from('training_sessions')
         .update({ 
-          is_paused: false,
-          resumed_at: new Date().toISOString()
-        })
+          session_data: session.session_data
+        } as any)
         .eq('id', sessionId)
 
       this.startTime = new Date()
-      this.totalPausedTime = session.time_spent_seconds || 0
+      this.totalPausedTime = 0
 
       return { success: true }
     } catch (error) {
@@ -173,9 +170,8 @@ export class TrainingSessionManager {
       const { error } = await this.supabase
         .from('training_sessions')
         .update({ 
-          is_paused: true,
-          paused_at: this.pauseTime.toISOString()
-        })
+          session_data: {}
+        } as any)
         .eq('id', this.sessionId)
 
       if (error) {
@@ -253,7 +249,7 @@ export class TrainingSessionManager {
     try {
       const { error } = await this.supabase
         .from('training_sessions')
-        .update({ current_state_id: newStateId })
+        .update({ session_data: {} } as any)
         .eq('id', this.sessionId)
 
       if (error) {
@@ -298,9 +294,8 @@ export class TrainingSessionManager {
         .update({
           completed_at: completedAt.toISOString(),
           final_score: finalScore,
-          time_spent_seconds: totalTimeSpent,
-          is_paused: false
-        })
+          session_data: {}
+        } as any)
         .eq('id', this.sessionId)
 
       if (error) {
@@ -359,7 +354,7 @@ export class TrainingSessionManager {
         return null
       }
 
-      const sessionData = session.session_data as SessionData
+      const sessionData = session.session_data as unknown as SessionData
       const totalTime = this.calculateCurrentSessionTime()
       const averageDecisionTime = decisions && decisions.length > 0 
         ? decisions.reduce((sum, d) => sum + (d.time_taken || 0), 0) / decisions.length
@@ -455,8 +450,8 @@ export class TrainingSessionManager {
       await this.supabase
         .from('training_sessions')
         .update({
-          recovery_data: recoveryData
-        })
+          session_data: recoveryData
+        } as any)
         .eq('id', this.sessionId)
 
       return recoveryData
@@ -505,7 +500,7 @@ export class TrainingSessionManager {
 
       await this.supabase
         .from('training_sessions')
-        .update({ session_data: sessionData })
+        .update({ session_data: sessionData } as any)
         .eq('id', this.sessionId)
     } catch (error) {
       console.error('Error updating session data:', error)

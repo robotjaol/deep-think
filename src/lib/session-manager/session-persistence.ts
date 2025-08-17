@@ -304,11 +304,11 @@ export class SessionPersistence {
       const { error: updateError } = await this.supabase
         .from('training_sessions')
         .update({
-          recovery_data: {
+          session_data: {
             checkpoints: [checkpoint],
             last_checkpoint: checkpointName
           }
-        })
+        } as any)
         .eq('id', sessionId)
 
       if (updateError) {
@@ -335,7 +335,7 @@ export class SessionPersistence {
     try {
       const { data: session, error: fetchError } = await this.supabase
         .from('training_sessions')
-        .select('recovery_data')
+        .select('session_data')
         .eq('id', sessionId)
         .single()
 
@@ -343,7 +343,7 @@ export class SessionPersistence {
         return { success: false, error: fetchError.message }
       }
 
-      const recoveryData = session.recovery_data as any
+      const recoveryData = session.session_data as any
       const checkpoint = recoveryData?.checkpoints?.find(
         (cp: any) => cp.name === checkpointName
       )
@@ -357,7 +357,7 @@ export class SessionPersistence {
         .from('training_sessions')
         .update({
           session_data: checkpoint.session_data
-        })
+        } as any)
         .eq('id', sessionId)
 
       if (updateError) {
